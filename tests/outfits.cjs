@@ -1,0 +1,13 @@
+const {buildSync}=require('esbuild');const Module=require('module');const assert=require('node:assert/strict');
+const code=buildSync({entryPoints:['lib/wardrobe.ts'],bundle:true,platform:'node',format:'cjs',write:false}).outputFiles[0].text;const mod=new Module('wardrobe-rules');mod._compile(code,'wardrobe-rules.cjs');const {buildTrip,newPlan,planSchema}=mod.exports;
+const g=(id,category,extra={})=>({id,name:id,section:'everyday',category,type:category,colour:category==='top'?'Ivory':'Navy',size:'M',brand:'',condition:'worn',fabric:'Cotton',occasions:['casual'],minTemp:18,maxTemp:35,favorite:false,available:true,createdAt:'2026-10-05',photo:null,...extra});
+const clothes=[g('top','top'),g('bottom','bottom'),g('top2','top',{colour:'Olive'}),g('bottom2','bottom',{colour:'Beige'}),g('layer','layer',{fabric:'Wool',minTemp:-10,maxTemp:20})];const plan={...newPlan(),date:'2026-10-10',location:'Bengaluru',temp:27};
+assert.equal(buildTrip(clothes,plan,null)[0].pieces.length,2);
+assert.equal(buildTrip(clothes,{...plan,occasion:'blacktie'},null)[0].pieces.length,0);
+assert.equal(buildTrip(clothes.map(x=>({...x,available:false})),plan,null)[0].pieces.length,0);
+const cold=buildTrip([g('top','top'),g('bottom','bottom',{minTemp:0}),clothes[4]],{...plan,temp:12},null)[0];assert(cold.pieces.some(x=>x.category==='layer'));
+assert.equal(buildTrip([g('silk','top',{fabric:'Silk / delicate'}),clothes[1]],{...plan,weather:'rain'},null)[0].pieces.length,0);
+const trip=buildTrip(clothes,{...plan,days:3,reuse:false},null);assert.equal(trip[0].pieces.length,2);assert.equal(trip[1].pieces.length,2);assert.equal(trip[2].pieces.length,0);assert.equal(trip[2].date,'2026-10-12');
+const ownHome=g('home','set',{section:'home',occasions:['home']});assert.equal(buildTrip([...clothes,ownHome],plan,null)[0].pieces.some(x=>x.id==='home'),false);assert.equal(buildTrip([...clothes,ownHome],{...plan,occasion:'home'},null)[0].pieces[0].id,'home');
+const forecast={location:'Test',timezone:'Asia/Kolkata',fetchedAt:'2026-10-05',hourly:{time:['2026-10-10T12:00'],temperature_2m:[30],weather_code:[61]}};assert.equal(buildTrip(clothes,{...plan,days:2},forecast)[0].weather,'rain');assert.equal(buildTrip(clothes,{...plan,days:2},forecast)[1].source,'manual');
+assert.equal(planSchema.safeParse({...plan,date:'2026-02-31'}).success,false);assert.equal(planSchema.safeParse({...plan,days:0}).success,false);console.log('PASS: complete pairs, strict occasion filtering, availability, cold layers, rain exclusions, no-rewear trips, home section isolation, forecast date fallback, input validation.');
